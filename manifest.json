@@ -1,15 +1,14 @@
 {
   "name": "Gather Tokens",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "manifest_version": 1,
-  "author": "ChatGPT",
+  "author": "ChatGPT/User",
   "icon": "/icon.png",
-
   "action": {
     "title": "Gather Tokens",
     "icon": "/icon.png",
     "popover": "/index.html",
-    "height": 120,
+    "height": 100,
     "width": 200
   }
 }
