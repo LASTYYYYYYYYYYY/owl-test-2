@@ -2,11 +2,10 @@ import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
 let savedSelection = [];
 
-OBR.onReady(async () => {
+OBR.onReady(() => {
 
-  // постоянно сохраняем выделение
   OBR.player.onChange(player => {
-    savedSelection = player.selection;
+    savedSelection = player.selection || [];
   });
 
   const button = document.getElementById("gather");
@@ -23,9 +22,11 @@ OBR.onReady(async () => {
     );
 
     if (!items.length) {
+      console.log("No items");
       return;
     }
 
+    // случайный центр
     const center =
       items[Math.floor(Math.random() * items.length)];
 
@@ -40,14 +41,18 @@ OBR.onReady(async () => {
 
         for (const item of drafts) {
 
-          item.position.x = baseX;
-          item.position.y = baseY - offset;
+          item.position = {
+            x: baseX,
+            y: baseY - offset
+          };
 
           offset += 20;
         }
 
       }
     );
+
+    console.log("Moved!");
 
   });
 
