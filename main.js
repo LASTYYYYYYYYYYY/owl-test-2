@@ -2,40 +2,39 @@ import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
 async function gatherTokens() {
 
-  const items = await OBR.scene.items.getItems();
-
   const selectedIds = await OBR.player.getSelection();
 
-  const selected = items.filter(item =>
-    selectedIds.includes(item.id)
-  );
-
-  if (selected.length === 0) {
+  if (selectedIds.length === 0) {
     return;
   }
 
-  // вычисляем центр всех токенов
-  let sumX = 0;
-  let sumY = 0;
+  const items = await OBR.scene.items.getItems(selectedIds);
 
-  for (const item of selected) {
-    sumX += item.position.x;
-    sumY += item.position.y;
+  if (items.length === 0) {
+    return;
   }
 
-  const centerX = sumX / selected.length;
-  const centerY = sumY / selected.length;
+  let centerX = 0;
+  let centerY = 0;
 
-  // переносим все токены в центр
+  for (const item of items) {
+    centerX += item.position.x;
+    centerY += item.position.y;
+  }
+
+  centerX /= items.length;
+  centerY /= items.length;
+
   await OBR.scene.items.updateItems(
-    selected.map(i => i.id),
-    items => {
+    selectedIds,
+    (items) => {
       for (const item of items) {
         item.position.x = centerX;
         item.position.y = centerY;
       }
     }
   );
+
 }
 
 OBR.onReady(() => {
