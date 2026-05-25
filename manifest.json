@@ -4,12 +4,9 @@
   "manifest_version": 1,
   "author": "ChatGPT",
   "icon": "/icon.png",
-  "description": "Move all selected tokens to their center point",
+
   "action": {
     "title": "Gather Tokens",
-    "icon": "/icon.png",
-    "popover": "/index.html",
-    "height": 120,
-    "width": 220
+    "icon": "/icon.png"
   }
 }
