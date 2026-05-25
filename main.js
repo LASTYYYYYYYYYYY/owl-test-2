@@ -1,64 +1,51 @@
 import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
-async function gatherTokens(items) {
+async function gatherTokens() {
 
-  if (!items || items.length === 0) {
+  const selectedIds = await OBR.player.getSelection();
+
+  if (!selectedIds || selectedIds.length === 0) {
     return;
   }
 
-  let centerX = 0;
-  let centerY = 0;
+  const items = await OBR.scene.items.getItems(
+    item => selectedIds.includes(item.id)
+  );
 
-  for (const item of items) {
-    centerX += item.position.x;
-    centerY += item.position.y;
+  if (items.length === 0) {
+    return;
   }
 
-  centerX /= items.length;
-  centerY /= items.length;
+  // случайный токен = центр
+  const centerItem =
+    items[Math.floor(Math.random() * items.length)];
+
+  const baseX = centerItem.position.x;
+  const baseY = centerItem.position.y;
 
   await OBR.scene.items.updateItems(
-    items.map(item => item.id),
-    (drafts) => {
+    selectedIds,
+    drafts => {
+
+      let offset = 0;
+
       for (const item of drafts) {
-        item.position.x = centerX;
-        item.position.y = centerY;
+
+        item.position.x = baseX;
+        item.position.y = baseY - offset;
+
+        offset += 20;
       }
+
     }
   );
+
 }
 
-OBR.onReady(async () => {
+OBR.onReady(() => {
 
-  await OBR.contextMenu.create({
-
-    id: "gather-tokens",
-
-    icons: [
-      {
-        icon: "/icon.png",
-        label: "Gather Tokens"
-      }
-    ],
-
-    filter: {
-      every: [
-        {
-          key: "type",
-          value: "IMAGE"
-        }
-      ]
-    },
-
-    async onClick(context) {
-
-      const items = await OBR.scene.items.getItems(
-        item => context.items.some(i => i.id === item.id)
-      );
-
-      await gatherTokens(items);
-    }
-
+  OBR.action.onClick(() => {
+    gatherTokens();
   });
 
 });
