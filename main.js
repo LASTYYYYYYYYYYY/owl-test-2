@@ -2,30 +2,27 @@ import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
 async function gatherTokens() {
 
-  const selectedIds = await OBR.player.getSelection();
+  const allItems = await OBR.scene.items.getItems();
 
-  console.log("Selected:", selectedIds);
-
-  if (!selectedIds.length) {
-    return;
-  }
-
-  const items = await OBR.scene.items.getItems(
-    item => selectedIds.includes(item.id)
+  const selectedItems = allItems.filter(
+    item => item.selected
   );
 
-  if (!items.length) {
+  if (selectedItems.length === 0) {
+    console.log("Nothing selected");
     return;
   }
 
   const center =
-    items[Math.floor(Math.random() * items.length)];
+    selectedItems[
+      Math.floor(Math.random() * selectedItems.length)
+    ];
 
   const baseX = center.position.x;
   const baseY = center.position.y;
 
   await OBR.scene.items.updateItems(
-    selectedIds,
+    selectedItems.map(i => i.id),
     drafts => {
 
       let offset = 0;
@@ -40,6 +37,8 @@ async function gatherTokens() {
 
     }
   );
+
+  console.log("Gathered!");
 
 }
 
