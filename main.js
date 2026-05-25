@@ -1,32 +1,28 @@
 import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
-async function gatherTokens() {
+const ACTION_ID = "gather-tokens-action";
 
-  const selectedIds = await OBR.player.getSelection();
+async function gatherSelectedTokens(context) {
 
-  if (selectedIds.length === 0) {
-    return;
-  }
+  const selectedItems = context.items;
 
-  const items = await OBR.scene.items.getItems(selectedIds);
-
-  if (items.length === 0) {
+  if (!selectedItems || selectedItems.length === 0) {
     return;
   }
 
   let centerX = 0;
   let centerY = 0;
 
-  for (const item of items) {
+  for (const item of selectedItems) {
     centerX += item.position.x;
     centerY += item.position.y;
   }
 
-  centerX /= items.length;
-  centerY /= items.length;
+  centerX /= selectedItems.length;
+  centerY /= selectedItems.length;
 
   await OBR.scene.items.updateItems(
-    selectedIds,
+    selectedItems.map(item => item.id),
     (items) => {
       for (const item of items) {
         item.position.x = centerX;
@@ -34,15 +30,33 @@ async function gatherTokens() {
       }
     }
   );
-
 }
 
-OBR.onReady(() => {
+OBR.onReady(async () => {
 
-  const button = document.getElementById("gather");
+  OBR.contextMenu.create({
+    id: ACTION_ID,
+    icons: [
+      {
+        icon: "/icon.png",
+        label: "Gather Tokens"
+      }
+    ],
 
-  button.addEventListener("click", async () => {
-    await gatherTokens();
+    embed: false,
+
+    filter: {
+      every: [
+        {
+          key: "type",
+          value: "IMAGE"
+        }
+      ]
+    },
+
+    onClick(context) {
+      gatherSelectedTokens(context);
+    }
   });
 
 });
