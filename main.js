@@ -1,8 +1,8 @@
 import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
-console.log("Gather & Shuffle Extension: Loaded");
+console.log("Gather & Shuffle: Loaded");
 
-// Функция для случайного перемешивания массива (Алгоритм Фишера-Йетса)
+// Функция случайного перемешивания
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -12,48 +12,41 @@ function shuffleArray(array) {
 }
 
 OBR.onReady(async () => {
-    console.log("Gather & Shuffle Ready");
-
     const button = document.getElementById("gather");
 
     button.addEventListener("click", async () => {
         try {
-            // 1. Получаем ID всех выбранных токенов
             const selection = await OBR.player.getSelection();
             if (!selection || selection.length === 0) return;
 
-            // 2. Получаем сами предметы, чтобы найти координаты "якоря"
             const items = await OBR.scene.items.getItems(selection);
-            const movableItems = items.filter(i => i.position);
-            if (movableItems.length === 0) return;
+            const tokens = items.filter(i => i.position);
+            if (tokens.length === 0) return;
 
-            // Точка, куда собираем "колоду" (позиция первого выбранного токена)
-            const targetX = movableItems[0].position.x;
-            const targetY = movableItems[0].position.y;
+            // 1. Находим самую верхнюю и левую точку среди всех выделенных токенов.
+            // Это будет наш неподвижный "якорь".
+            const anchorX = Math.min(...tokens.map(t => t.position.x));
+            const anchorY = Math.min(...tokens.map(t => t.position.y));
 
-            // 3. ПЕРЕМЕШИВАЕМ список ID перед обновлением
-            const shuffledSelection = shuffleArray([...selection]);
+            // 2. Перемешиваем массив ID
+            const shuffledIds = shuffleArray([...selection]);
 
-            console.log("Shuffling and gathering...");
-
-            // 4. Обновляем позиции токенов в случайном порядке
-            let currentOffset = 0;
-            await OBR.scene.items.updateItems(shuffledSelection, (drafts) => {
-                // Теперь drafts будут обрабатываться в том случайном порядке, 
-                // который мы создали в shuffledSelection
-                for (const item of drafts) {
+            // 3. Обновляем позиции
+            // Используем индекс (i), чтобы задать смещение от фиксированного якоря
+            await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
+                // ВАЖНО: updateItems возвращает drafts в том же порядке, в котором переданы ID.
+                // Поэтому мы просто проходим по ним циклом с индексом.
+                drafts.forEach((item, index) => {
                     if (item.position) {
                         item.position = {
-                            x: targetX,
-                            y: targetY + currentOffset
+                            x: anchorX,
+                            y: anchorY + (index * 4) // Смещение 4px от фиксированного верха
                         };
-                        // Твой зазор в 4 пикселя
-                        currentOffset += 4; 
                     }
-                }
+                });
             });
 
-            console.log("Done! Deck shuffled.");
+            console.log("Shuffle complete. Anchor stayed at:", anchorX, anchorY);
         } catch (error) {
             console.error("Error:", error);
         }
