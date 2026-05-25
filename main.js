@@ -4,7 +4,7 @@ let savedSelection = [];
 
 OBR.onReady(() => {
 
-  OBR.player.onChange(player => {
+  OBR.player.onChange((player) => {
     savedSelection = player.selection || [];
   });
 
@@ -12,7 +12,7 @@ OBR.onReady(() => {
 
   button.addEventListener("click", async () => {
 
-    if (!savedSelection.length) {
+    if (savedSelection.length === 0) {
       console.log("No selection");
       return;
     }
@@ -21,12 +21,12 @@ OBR.onReady(() => {
       item => savedSelection.includes(item.id)
     );
 
-    if (!items.length) {
-      console.log("No items");
+    if (items.length === 0) {
+      console.log("No items found");
       return;
     }
 
-    // случайный центр
+    // случайный токен как центр
     const center =
       items[Math.floor(Math.random() * items.length)];
 
@@ -35,13 +35,13 @@ OBR.onReady(() => {
 
     await OBR.scene.items.updateItems(
       savedSelection,
-      drafts => {
+      (drafts) => {
 
         let offset = 0;
 
         for (const item of drafts) {
 
-          item.position = {
+          item.localPosition = {
             x: baseX,
             y: baseY - offset
           };
