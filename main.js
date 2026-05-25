@@ -1,28 +1,31 @@
 import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
 
+let lastSelection = [];
+
 async function gatherTokens() {
 
-  const allItems = await OBR.scene.items.getItems();
+  if (!lastSelection.length) {
+    console.log("No saved selection");
+    return;
+  }
 
-  const selectedItems = allItems.filter(
-    item => item.selected
+  const items = await OBR.scene.items.getItems(
+    item => lastSelection.includes(item.id)
   );
 
-  if (selectedItems.length === 0) {
-    console.log("Nothing selected");
+  if (!items.length) {
+    console.log("No items");
     return;
   }
 
   const center =
-    selectedItems[
-      Math.floor(Math.random() * selectedItems.length)
-    ];
+    items[Math.floor(Math.random() * items.length)];
 
   const baseX = center.position.x;
   const baseY = center.position.y;
 
   await OBR.scene.items.updateItems(
-    selectedItems.map(i => i.id),
+    lastSelection,
     drafts => {
 
       let offset = 0;
@@ -38,12 +41,22 @@ async function gatherTokens() {
     }
   );
 
-  console.log("Gathered!");
+  console.log("Moved!");
 
 }
 
-OBR.onReady(() => {
+OBR.onReady(async () => {
 
+  // следим за выделением
+  OBR.player.onChange(player => {
+
+    lastSelection = player.selection;
+
+    console.log("Saved selection:", lastSelection);
+
+  });
+
+  // запуск при открытии popup
   gatherTokens();
 
 });
