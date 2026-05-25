@@ -4,7 +4,9 @@ async function gatherTokens() {
 
   const selectedIds = await OBR.player.getSelection();
 
-  if (!selectedIds || selectedIds.length === 0) {
+  console.log("Selected:", selectedIds);
+
+  if (!selectedIds.length) {
     return;
   }
 
@@ -12,16 +14,15 @@ async function gatherTokens() {
     item => selectedIds.includes(item.id)
   );
 
-  if (items.length === 0) {
+  if (!items.length) {
     return;
   }
 
-  // случайный токен = центр
-  const centerItem =
+  const center =
     items[Math.floor(Math.random() * items.length)];
 
-  const baseX = centerItem.position.x;
-  const baseY = centerItem.position.y;
+  const baseX = center.position.x;
+  const baseY = center.position.y;
 
   await OBR.scene.items.updateItems(
     selectedIds,
@@ -44,8 +45,6 @@ async function gatherTokens() {
 
 OBR.onReady(() => {
 
-  OBR.action.onClick(() => {
-    gatherTokens();
-  });
+  gatherTokens();
 
 });
