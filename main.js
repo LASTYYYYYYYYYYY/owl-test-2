@@ -1,52 +1,48 @@
-import OBR from "https://unpkg.com/@owlbear-rodeo/sdk@latest/dist/index.mjs";
+// Поменяли ссылку на jsdelivr - он стабильнее работает с CORS на Vercel
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/dist/index.mjs";
+
+console.log("Скрипт main.js загружен!"); // Если видишь это в консоли - победа
 
 OBR.onReady(async () => {
-    console.log("Extension Ready");
+    console.log("Библиотека OBR готова!");
 
     const button = document.getElementById("gather");
 
     button.addEventListener("click", async () => {
-        // 1. Получаем ID текущего выделения
-        const selection = await OBR.player.getSelection();
+        try {
+            const selection = await OBR.player.getSelection();
 
-        if (!selection || selection.length === 0) {
-            alert("Сначала выдели токен(ы) на карте!");
-            return;
-        }
-
-        // 2. Получаем объекты токенов по их ID
-        const items = await OBR.scene.items.getItems(selection);
-        
-        // Фильтруем только те предметы, которые имеют позицию (токены)
-        const tokens = items.filter(item => item.position);
-
-        if (tokens.length === 0) return;
-
-        // 3. Берем координаты ПЕРВОГО выделенного токена как точку сбора
-        const targetX = tokens[0].position.x;
-        const targetY = tokens[0].position.y;
-
-        console.log(`Собираем ${tokens.length} токенов в точке:`, targetX, targetY);
-
-        // 4. Запускаем обновление
-        let offset = 0;
-        await OBR.scene.items.updateItems(selection, (drafts) => {
-            for (const item of drafts) {
-                // Игнорируем фоновые рисунки, если они попали в выделение
-                if (item.position) {
-                    // Устанавливаем новую позицию
-                    item.position = {
-                        x: targetX,
-                        y: targetY + offset
-                    };
-                    
-                    // Если токен "заблокирован", мы всё равно его двигаем этим кодом
-                    // Шаг смещения (например, 50 пикселей вниз для каждого следующего)
-                    offset += 70; 
-                }
+            if (!selection || selection.length === 0) {
+                console.log("Ничего не выбрано");
+                return;
             }
-        });
 
-        console.log("Готово!");
+            const items = await OBR.scene.items.getItems(selection);
+            const tokens = items.filter(item => item.position);
+
+            if (tokens.length === 0) return;
+
+            // Точка сбора - координаты первого токена
+            const targetX = tokens[0].position.x;
+            const targetY = tokens[0].position.y;
+
+            let offset = 0;
+            await OBR.scene.items.updateItems(selection, (drafts) => {
+                for (const item of drafts) {
+                    if (item.position) {
+                        item.position = {
+                            x: targetX,
+                            y: targetY + offset
+                        };
+                        // Делаем шаг в 50 пикселей для каждого следующего
+                        offset += 50; 
+                    }
+                }
+            });
+
+            console.log("Токены собраны!");
+        } catch (e) {
+            console.error("Ошибка при клике:", e);
+        }
     });
 });
