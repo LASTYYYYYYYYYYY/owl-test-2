@@ -7,6 +7,9 @@
 
   "action": {
     "title": "Gather Tokens",
-    "icon": "/icon.png"
+    "icon": "/icon.png",
+    "popover": "/index.html",
+    "height": 1,
+    "width": 1
   }
 }
