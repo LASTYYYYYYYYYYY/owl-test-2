@@ -1,8 +1,7 @@
 import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
-console.log("Gather & Shuffle: Loaded");
+console.log("Deck Shuffler: Loaded");
 
-// Функция случайного перемешивания
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -23,32 +22,35 @@ OBR.onReady(async () => {
             const tokens = items.filter(i => i.position);
             if (tokens.length === 0) return;
 
-            // 1. Находим самую верхнюю и левую точку среди всех выделенных токенов.
-            // Это будет наш неподвижный "якорь".
+            // 1. Фиксируем точку якоря (самый верхний левый угол выделения)
             const anchorX = Math.min(...tokens.map(t => t.position.x));
             const anchorY = Math.min(...tokens.map(t => t.position.y));
 
-            // 2. Перемешиваем массив ID
+            // 2. Перемешиваем массив ID случайным образом
             const shuffledIds = shuffleArray([...selection]);
 
-            // 3. Обновляем позиции
-            // Используем индекс (i), чтобы задать смещение от фиксированного якоря
+            // 3. Массовое обновление
             await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
-                // ВАЖНО: updateItems возвращает drafts в том же порядке, в котором переданы ID.
-                // Поэтому мы просто проходим по ним циклом с индексом.
+                // ВАЖНО: drafts здесь идут в том порядке, который мы задали в shuffledIds
                 drafts.forEach((item, index) => {
                     if (item.position) {
+                        // Устанавливаем координаты
                         item.position = {
                             x: anchorX,
-                            y: anchorY + (index * 4) // Смещение 4px от фиксированного верха
+                            y: anchorY + (index * 4) 
                         };
+
+                        // ПЕРЕМЕШИВАЕМ Z-ORDER (Ось Z)
+                        // Присваиваем zIndex на основе индекса в перемешанном массиве.
+                        // Чем выше индекс, тем "выше" карта визуально.
+                        item.zIndex = index; 
                     }
                 });
             });
 
-            console.log("Shuffle complete. Anchor stayed at:", anchorX, anchorY);
+            console.log("Deck shuffled on Y and Z axis!");
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Shuffle Error:", error);
         }
     });
 });
