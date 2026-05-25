@@ -4,8 +4,10 @@ let savedSelection = [];
 
 OBR.onReady(() => {
 
+  // сохраняем выделение
   OBR.player.onChange((player) => {
     savedSelection = player.selection || [];
+    console.log("Selection:", savedSelection);
   });
 
   const button = document.getElementById("gather");
@@ -17,6 +19,7 @@ OBR.onReady(() => {
       return;
     }
 
+    // получаем выбранные items
     const items = await OBR.scene.items.getItems(
       item => savedSelection.includes(item.id)
     );
@@ -26,25 +29,26 @@ OBR.onReady(() => {
       return;
     }
 
-    // случайный токен как центр
+    // случайный токен = база
     const center =
       items[Math.floor(Math.random() * items.length)];
 
     const baseX = center.position.x;
     const baseY = center.position.y;
 
+    // ВАЖНО:
+    // updateItems(items, ...)
+    // а не updateItems(ids, ...)
     await OBR.scene.items.updateItems(
-      savedSelection,
+      items,
       (drafts) => {
 
         let offset = 0;
 
         for (const item of drafts) {
 
-          item.localPosition = {
-            x: baseX,
-            y: baseY - offset
-          };
+          item.position.x = baseX;
+          item.position.y = baseY - offset;
 
           offset += 20;
         }
