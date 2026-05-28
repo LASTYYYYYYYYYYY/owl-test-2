@@ -1,6 +1,6 @@
 {
   "name": "Shuffle Cards",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "manifest_version": 1,
   "author": "ChatGPT",
   "icon": "/icon.png",
@@ -8,7 +8,7 @@
     "title": "Перемешать карты",
     "icon": "/icon.png",
     "popover": "/index.html",
-    "height": 80,
-    "width": 200
+    "height": 130,
+    "width": 220
   }
 }
