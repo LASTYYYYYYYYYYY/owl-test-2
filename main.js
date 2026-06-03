@@ -15,7 +15,6 @@ OBR.onReady(async () => {
     const offsetSlider = document.getElementById("offsetSlider");
     const offsetValueSpan = document.getElementById("offsetValue");
 
-    // Инициализация значения ползунка и отображение
     offsetValueSpan.textContent = offsetSlider.value;
 
     offsetSlider.addEventListener("input", () => {
@@ -28,38 +27,45 @@ OBR.onReady(async () => {
             if (!selection || selection.length === 0) return;
 
             const items = await OBR.scene.items.getItems(selection);
+            // Фильтруем только те элементы, у которых есть позиция
             const tokens = items.filter(i => i.position);
             if (tokens.length === 0) return;
 
             const cardOffset = parseInt(offsetSlider.value, 10);
 
-            // 1. Фиксируем точку якоря (самый верхний левый угол выделения)
+            // 1. Фиксируем точку якоря
             const anchorX = Math.min(...tokens.map(t => t.position.x));
             const anchorY = Math.min(...tokens.map(t => t.position.y));
 
-            // 2. Перемешиваем массив ID случайным образом
-            const shuffledIds = shuffleArray([...selection]);
+            // 2. Перемешиваем копию массива ID
+            const shuffledIds = shuffleArray([...tokens.map(t => t.id)]);
 
-            // 3. Массовое обновление
-            await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
-                // ВАЖНО: drafts здесь идут в том порядке, который мы задали в shuffledIds
-                drafts.forEach((item, index) => {
-                    if (item.position) {
-                        // Устанавливаем координаты с учетом ползунка
+            // 3. Создаем "карту соответствия": ID элемента -> его новое место в стопке
+            const orderMap = {};
+            shuffledIds.forEach((id, index) => {
+                orderMap[id] = index;
+            });
+
+            // 4. Массовое обновление
+            await OBR.scene.items.updateItems(selection, (drafts) => {
+                drafts.forEach((item) => {
+                    if (item.position && orderMap[item.id] !== undefined) {
+                        const newIndex = orderMap[item.id];
+                        
+                        // Устанавливаем координаты
                         item.position = {
                             x: anchorX,
-                            y: anchorY + (index * cardOffset) 
+                            y: anchorY + (newIndex * cardOffset) 
                         };
 
-                        // ПЕРЕМЕШИВАЕМ Z-ORDER (Ось Z)
-                        // Присваиваем zIndex на основе индекса в перемешанном массиве.
-                        // Чем выше индекс, тем "выше" карта визуально.
-                        item.zIndex = index; 
+                        // ПЕРЕМЕШИВАЕМ Z-ORDER
+                        // Теперь мы берем индекс именно из перемешанного словаря
+                        item.zIndex = newIndex; 
                     }
                 });
             });
 
-            console.log(`Deck shuffled on Y and Z axis with offset: ${cardOffset}!`);
+            console.log(`Deck shuffled! Offset: ${cardOffset}`);
         } catch (error) {
             console.error("Shuffle Error:", error);
         }
