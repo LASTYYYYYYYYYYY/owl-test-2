@@ -15,6 +15,7 @@ OBR.onReady(async () => {
     const offsetSlider = document.getElementById("offsetSlider");
     const offsetValueSpan = document.getElementById("offsetValue");
 
+    // Инициализация значения ползунка и отображение
     offsetValueSpan.textContent = offsetSlider.value;
 
     offsetSlider.addEventListener("input", () => {
@@ -27,45 +28,50 @@ OBR.onReady(async () => {
             if (!selection || selection.length === 0) return;
 
             const items = await OBR.scene.items.getItems(selection);
-            // Фильтруем только те элементы, у которых есть позиция
             const tokens = items.filter(i => i.position);
             if (tokens.length === 0) return;
 
             const cardOffset = parseInt(offsetSlider.value, 10);
 
-            // 1. Фиксируем точку якоря
+            // 1. Фиксируем точку якоря (самый верхний левый угол выделения)
             const anchorX = Math.min(...tokens.map(t => t.position.x));
             const anchorY = Math.min(...tokens.map(t => t.position.y));
 
-            // 2. Перемешиваем копию массива ID
-            const shuffledIds = shuffleArray([...tokens.map(t => t.id)]);
+            // 2. Перемешиваем массив ID случайным образом
+            const shuffledIds = shuffleArray([...selection]);
 
-            // 3. Создаем "карту соответствия": ID элемента -> его новое место в стопке
-            const orderMap = {};
-            shuffledIds.forEach((id, index) => {
-                orderMap[id] = index;
-            });
-
-            // 4. Массовое обновление
-            await OBR.scene.items.updateItems(selection, (drafts) => {
-                drafts.forEach((item) => {
-                    if (item.position && orderMap[item.id] !== undefined) {
-                        const newIndex = orderMap[item.id];
-                        
-                        // Устанавливаем координаты
+            // 3. Массовое обновление
+            await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
+                const uniqueZIndexes = new Set(); // Для отслеживания уникальных zIndex
+                
+                // ВАЖНО: drafts здесь идут в том порядке, который мы задали в shuffledIds
+                drafts.forEach((item, index) => {
+                    if (item.position) {
+                        // Устанавливаем координаты с учетом ползунка
                         item.position = {
                             x: anchorX,
-                            y: anchorY + (newIndex * cardOffset) 
+                            y: anchorY + (index * cardOffset) 
                         };
 
-                        // ПЕРЕМЕШИВАЕМ Z-ORDER
-                        // Теперь мы берем индекс именно из перемешанного словаря
-                        item.zIndex = newIndex; 
+                        // ПЕРЕМЕШИВАЕМ Z-ORDER (Ось Z)
+                        // Присваиваем уникальный zIndex, чтобы избежать конфликтов и
+                        // гарантировать, что OBR воспринимает это как новое состояние.
+                        // Используем timestamp в комбинации с индексом для уникальности.
+                        // Если zIndex уже существует, добавляем небольшое смещение.
+                        let newZIndex = index;
+                        // Проверяем, существует ли уже такой zIndex в текущем наборе
+                        // и при необходимости добавляем маленькое смещение для уникальности.
+                        // Это нужно, чтобы OBR однозначно видел, что порядок изменился.
+                        while(uniqueZIndexes.has(newZIndex)) {
+                            newZIndex += 0.0001; // Добавляем очень маленькое смещение
+                        }
+                        item.zIndex = newZIndex;
+                        uniqueZIndexes.add(newZIndex);
                     }
                 });
             });
 
-            console.log(`Deck shuffled! Offset: ${cardOffset}`);
+            console.log(`Deck shuffled on Y and Z axis with offset: ${cardOffset}!`);
         } catch (error) {
             console.error("Shuffle Error:", error);
         }
