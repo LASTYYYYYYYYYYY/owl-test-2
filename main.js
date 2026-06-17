@@ -26,8 +26,8 @@ OBR.onReady(async () => {
     });
 
     const updateDeckLocationDisplay = async () => {
-        const metadata = await OBR.room.getMetadata();
-        const deckLocation = metadata[METADATA_DECK_LOCATION_KEY];
+        const roomMetadata = await OBR.room.getMetadata();
+        const deckLocation = roomMetadata[METADATA_DECK_LOCATION_KEY];
         if (deckLocation) {
             deckLocationDisplay.textContent = `Место колоды: X:${deckLocation.x.toFixed(0)}, Y:${deckLocation.y.toFixed(0)}`;
         } else {
@@ -36,7 +36,7 @@ OBR.onReady(async () => {
     };
 
     await updateDeckLocationDisplay();
-    OBR.room.onMetadataChange(updateDeckLocationDisplay);
+    OBR.room.onMetadataChange(updateDeckLocationDisplay); // Обновляем отображение, если место меняется
 
     shuffleButton.addEventListener("click", async () => {
         try {
@@ -45,36 +45,39 @@ OBR.onReady(async () => {
             let savedDeckLocation = roomMetadata[METADATA_DECK_LOCATION_KEY];
 
             let targetX, targetY;
-            let cardsToProcess = [];
-            const currentSelectionIds = await OBR.player.getSelection();
+            let cardsToProcessIds = [];
+
+            // Получаем текущее выделение пользователя
+            const currentManualSelectionIds = await OBR.player.getSelection();
 
             if (rememberDeckLocationCheckbox.checked || !savedDeckLocation) {
                 // Сценарий 1: Запоминаем новое место колоды ИЛИ место еще не задано
-                if (!currentSelectionIds || currentSelectionIds.length === 0) {
+                if (!currentManualSelectionIds || currentManualSelectionIds.length === 0) {
                     alert("Пожалуйста, выберите карты, чтобы запомнить новое место колоды.");
                     rememberDeckLocationCheckbox.checked = false;
                     return;
                 }
-
-                const selectedItems = await OBR.scene.items.getItems(currentSelectionIds);
-                cardsToProcess = selectedItems.filter(i => i.position);
-                if (cardsToProcess.length === 0) {
-                    alert("Пожалуйста, выберите карты, чтобы запомнить новое место колоды.");
-                    rememberDeckLocationCheckbox.checked = false;
-                    return;
-                }
-
+                cardsToProcessIds = currentManualSelectionIds; // Обрабатываем текущее выделение
+                
                 // Определяем якорь из текущего выделения
-                targetX = Math.min(...cardsToProcess.map(t => t.position.x));
-                targetY = Math.min(...cardsToProcess.map(t => t.position.y));
+                const selectedItemsForAnchor = await OBR.scene.items.getItems(cardsToProcessIds);
+                const actualCardsForAnchor = selectedItemsForAnchor.filter(i => i.position);
+                if (actualCardsForAnchor.length === 0) {
+                     alert("Выделенные элементы не являются перемещаемыми картами.");
+                     rememberDeckLocationCheckbox.checked = false;
+                     return;
+                }
+
+                targetX = Math.min(...actualCardsForAnchor.map(t => t.position.x));
+                targetY = Math.min(...actualCardsForAnchor.map(t => t.position.y));
                 await OBR.room.setMetadata({
                     [METADATA_DECK_LOCATION_KEY]: { x: targetX, y: targetY }
                 });
                 savedDeckLocation = { x: targetX, y: targetY };
                 console.log(`Deck location remembered: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
-                rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс
+                rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс после запоминания
             } else {
-                // Сценарий 2: Используем уже запомненное место колоды
+                // Сценарий 2: Используем уже запомненное место колоды, автоматически выделяем помеченные карты
                 targetX = savedDeckLocation.x;
                 targetY = savedDeckLocation.y;
                 console.log(`Using remembered deck location: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
@@ -83,41 +86,36 @@ OBR.onReady(async () => {
                 const allItemIds = await OBR.scene.items.getAllItemIds();
                 const allItems = await OBR.scene.items.getItems(allItemIds);
                 
-                // Отфильтровываем карты, которые помечены как часть колоды
-                const markedDeckCards = allItems.filter(item => 
-                    item.metadata[METADATA_IS_DECK_CARD_KEY] === true && item.position
-                );
+                const markedDeckCardIds = allItems
+                    .filter(item => item.metadata[METADATA_IS_DECK_CARD_KEY] === true && item.position)
+                    .map(item => item.id);
 
-                // Если есть текущее выделение, добавляем его к обрабатываемым картам (если их еще нет)
-                let selectedItems = [];
-                if (currentSelectionIds && currentSelectionIds.length > 0) {
-                    selectedItems = await OBR.scene.items.getItems(currentSelectionIds);
-                    selectedItems = selectedItems.filter(i => i.position);
-                }
+                // Объединяем автоматически найденные карты и текущее ручное выделение (без дубликатов)
+                const combinedIdsSet = new Set([...markedDeckCardIds, ...(currentManualSelectionIds || [])]);
+                cardsToProcessIds = Array.from(combinedIdsSet);
 
-                // Объединяем помеченные карты и текущее выделение (без дубликатов)
-                const combinedCardsMap = new Map();
-                markedDeckCards.forEach(card => combinedCardsMap.set(card.id, card));
-                selectedItems.forEach(card => combinedCardsMap.set(card.id, card));
-                
-                cardsToProcess = Array.from(combinedCardsMap.values());
-
-                if (cardsToProcess.length === 0) {
-                    alert("Место колоды задано, но нет помеченных или выделенных карт для обработки.");
+                if (cardsToProcessIds.length === 0) {
+                    alert("Место колоды задано, но нет помеченных или выделенных карт для обработки. Пожалуйста, выберите карты, чтобы начать колоду.");
                     return;
                 }
+                
+                // Автоматически выделяем все эти карты для игрока
+                await OBR.player.setSelection(cardsToProcessIds);
+                console.log(`Automatically selected ${cardsToProcessIds.length} cards for processing.`);
             }
 
-            if (cardsToProcess.length === 0) {
-                alert("Нет карт для обработки. Пожалуйста, выберите карты или сначала задайте место колоды.");
+            // Получаем данные по всем ID, которые будут обрабатываться
+            const actualCardsToProcess = (await OBR.scene.items.getItems(cardsToProcessIds)).filter(i => i.position);
+            if (actualCardsToProcess.length === 0) {
+                alert("Нет перемещаемых карт для обработки.");
                 return;
             }
 
             // Перемешиваем массив ID обрабатываемых карт
-            const cardIdsToUpdate = shuffleArray(cardsToProcess.map(card => card.id));
+            const shuffledIdsForUpdate = shuffleArray(actualCardsToProcess.map(card => card.id));
 
             // Массовое обновление
-            await OBR.scene.items.updateItems(cardIdsToUpdate, (drafts) => {
+            await OBR.scene.items.updateItems(shuffledIdsForUpdate, (drafts) => {
                 const uniqueZIndexes = new Set(); 
                 
                 drafts.forEach((item, index) => {
@@ -140,7 +138,7 @@ OBR.onReady(async () => {
                 });
             });
 
-            console.log(`Deck shuffled and positioned with offset: ${cardOffset}! Total cards processed: ${cardsToProcess.length}`);
+            console.log(`Deck shuffled and positioned with offset: ${cardOffset}! Total cards processed: ${actualCardsToProcess.length}`);
             await updateDeckLocationDisplay();
         } catch (error) {
             console.error("Shuffle Error:", error);
