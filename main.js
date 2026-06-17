@@ -20,14 +20,11 @@ OBR.onReady(async () => {
     const rememberDeckLocationCheckbox = document.getElementById("rememberDeckLocation");
     const deckLocationDisplay = document.getElementById("deckLocationDisplay");
 
-    // Инициализация значения ползунка и отображение
     offsetValueSpan.textContent = offsetSlider.value;
-
     offsetSlider.addEventListener("input", () => {
         offsetValueSpan.textContent = offsetSlider.value;
     });
 
-    // Функция для обновления отображения места колоды
     const updateDeckLocationDisplay = async () => {
         const metadata = await OBR.room.getMetadata();
         const deckLocation = metadata[METADATA_DECK_LOCATION_KEY];
@@ -38,35 +35,32 @@ OBR.onReady(async () => {
         }
     };
 
-    // Обновляем при загрузке
     await updateDeckLocationDisplay();
-
-    // Слушатель для изменений метаданных комнаты
     OBR.room.onMetadataChange(updateDeckLocationDisplay);
 
     shuffleButton.addEventListener("click", async () => {
         try {
             const cardOffset = parseInt(offsetSlider.value, 10);
-            const metadata = await OBR.room.getMetadata();
-            let savedDeckLocation = metadata[METADATA_DECK_LOCATION_KEY];
+            const roomMetadata = await OBR.room.getMetadata();
+            let savedDeckLocation = roomMetadata[METADATA_DECK_LOCATION_KEY];
 
             let targetX, targetY;
             let cardsToProcess = [];
-            let currentSelection = await OBR.player.getSelection();
+            const currentSelectionIds = await OBR.player.getSelection();
 
             if (rememberDeckLocationCheckbox.checked || !savedDeckLocation) {
                 // Сценарий 1: Запоминаем новое место колоды ИЛИ место еще не задано
-                if (!currentSelection || currentSelection.length === 0) {
+                if (!currentSelectionIds || currentSelectionIds.length === 0) {
                     alert("Пожалуйста, выберите карты, чтобы запомнить новое место колоды.");
-                    rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс
+                    rememberDeckLocationCheckbox.checked = false;
                     return;
                 }
 
-                const selectedItems = await OBR.scene.items.getItems(currentSelection);
+                const selectedItems = await OBR.scene.items.getItems(currentSelectionIds);
                 cardsToProcess = selectedItems.filter(i => i.position);
                 if (cardsToProcess.length === 0) {
                     alert("Пожалуйста, выберите карты, чтобы запомнить новое место колоды.");
-                    rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс
+                    rememberDeckLocationCheckbox.checked = false;
                     return;
                 }
 
@@ -76,32 +70,41 @@ OBR.onReady(async () => {
                 await OBR.room.setMetadata({
                     [METADATA_DECK_LOCATION_KEY]: { x: targetX, y: targetY }
                 });
-                savedDeckLocation = { x: targetX, y: targetY }; // Обновляем локальную переменную
+                savedDeckLocation = { x: targetX, y: targetY };
                 console.log(`Deck location remembered: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
-                rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс после запоминания
+                rememberDeckLocationCheckbox.checked = false; // Сбрасываем чекбокс
             } else {
-                // Сценарий 2: Используем уже запомненное место колоды, ищем помеченные карты
+                // Сценарий 2: Используем уже запомненное место колоды
                 targetX = savedDeckLocation.x;
                 targetY = savedDeckLocation.y;
                 console.log(`Using remembered deck location: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
                 
-                // Ищем все карты на сцене с меткой нашей колоды
-                const allItems = await OBR.scene.items.getAllItems();
-                cardsToProcess = allItems.filter(item => item.metadata[METADATA_IS_DECK_CARD_KEY] && item.position);
+                // Получаем ВСЕ элементы на сцене, чтобы найти помеченные карты
+                const allItemIds = await OBR.scene.items.getAllItemIds();
+                const allItems = await OBR.scene.items.getItems(allItemIds);
+                
+                // Отфильтровываем карты, которые помечены как часть колоды
+                const markedDeckCards = allItems.filter(item => 
+                    item.metadata[METADATA_IS_DECK_CARD_KEY] === true && item.position
+                );
+
+                // Если есть текущее выделение, добавляем его к обрабатываемым картам (если их еще нет)
+                let selectedItems = [];
+                if (currentSelectionIds && currentSelectionIds.length > 0) {
+                    selectedItems = await OBR.scene.items.getItems(currentSelectionIds);
+                    selectedItems = selectedItems.filter(i => i.position);
+                }
+
+                // Объединяем помеченные карты и текущее выделение (без дубликатов)
+                const combinedCardsMap = new Map();
+                markedDeckCards.forEach(card => combinedCardsMap.set(card.id, card));
+                selectedItems.forEach(card => combinedCardsMap.set(card.id, card));
+                
+                cardsToProcess = Array.from(combinedCardsMap.values());
 
                 if (cardsToProcess.length === 0) {
-                    // Если помеченных карт нет, но место колоды есть, то просим выделить
-                    if (!currentSelection || currentSelection.length === 0) {
-                        alert("Место колоды задано, но нет помеченных карт. Пожалуйста, выберите карты для первоначального добавления в колоду.");
-                        return;
-                    }
-                    const selectedItems = await OBR.scene.items.getItems(currentSelection);
-                    cardsToProcess = selectedItems.filter(i => i.position);
-                    if (cardsToProcess.length === 0) {
-                         alert("Место колоды задано, но нет помеченных карт. Пожалуйста, выберите карты для первоначального добавления в колоду.");
-                         return;
-                    }
-                    console.log("No marked deck cards found, using current selection to start new deck.");
+                    alert("Место колоды задано, но нет помеченных или выделенных карт для обработки.");
+                    return;
                 }
             }
 
@@ -119,16 +122,13 @@ OBR.onReady(async () => {
                 
                 drafts.forEach((item, index) => {
                     if (item.position) {
-                        // Устанавливаем координаты на целевое место
                         item.position = {
                             x: targetX,
                             y: targetY + (index * cardOffset) 
                         };
 
-                        // Помечаем карту как часть колоды, если она еще не помечена
-                        if (item.metadata[METADATA_IS_DECK_CARD_KEY] !== true) {
-                            item.metadata[METADATA_IS_DECK_CARD_KEY] = true;
-                        }
+                        // Помечаем карту как часть колоды
+                        item.metadata[METADATA_IS_DECK_CARD_KEY] = true;
 
                         let newZIndex = index;
                         while(uniqueZIndexes.has(newZIndex)) {
@@ -141,7 +141,7 @@ OBR.onReady(async () => {
             });
 
             console.log(`Deck shuffled and positioned with offset: ${cardOffset}! Total cards processed: ${cardsToProcess.length}`);
-            await updateDeckLocationDisplay(); // Обновляем отображение
+            await updateDeckLocationDisplay();
         } catch (error) {
             console.error("Shuffle Error:", error);
         }
