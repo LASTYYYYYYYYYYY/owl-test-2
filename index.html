@@ -24,9 +24,6 @@
       font-weight: bold;
       flex-shrink: 0; /* Чтобы кнопка не сжималась */
     }
-    button.secondary {
-        background: #f97316; /* Оранжевый для вторичной кнопки */
-    }
     .slider-container {
       display: flex;
       flex-direction: column;
@@ -64,6 +61,14 @@
         display: flex;
         justify-content: space-between;
     }
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.9em;
+        margin-top: -5px;
+        margin-bottom: 5px;
+    }
     #deckLocationDisplay {
         font-size: 0.8em;
         color: #a0a0a0;
@@ -75,8 +80,14 @@
 <body>
 
   <button id="shuffle">
-    Перемешать карты (в выделении)
+    Перемешать карты
   </button>
+  
+  <div class="checkbox-container">
+    <input type="checkbox" id="rememberDeckLocation">
+    <label for="rememberDeckLocation">Запомнить / Использовать место колоды</label>
+  </div>
+  <div id="deckLocationDisplay">Место колоды не задано</div>
 
   <div class="slider-container">
     <div class="slider-label">
@@ -85,15 +96,6 @@
     </div>
     <input type="range" id="offsetSlider" min="0" max="20" value="4">
   </div>
-
-  <button id="setDeckLocation" class="secondary">
-    Установить место для колоды
-  </button>
-  <div id="deckLocationDisplay">Место колоды не задано</div>
-
-  <button id="collectCards">
-    Собрать выделенные карты в колоду
-  </button>
 
   <script type="module" src="./main.js"></script>
 
