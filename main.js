@@ -16,9 +16,8 @@ OBR.onReady(async () => {
     const shuffleButton = document.getElementById("shuffle");
     const offsetSlider = document.getElementById("offsetSlider");
     const offsetValueSpan = document.getElementById("offsetValue");
-    const setDeckLocationButton = document.getElementById("setDeckLocation");
+    const rememberDeckLocationCheckbox = document.getElementById("rememberDeckLocation");
     const deckLocationDisplay = document.getElementById("deckLocationDisplay");
-    const collectCardsButton = document.getElementById("collectCards");
 
     // Инициализация значения ползунка и отображение
     offsetValueSpan.textContent = offsetSlider.value;
@@ -33,23 +32,24 @@ OBR.onReady(async () => {
         const deckLocation = metadata[METADATA_DECK_LOCATION_KEY];
         if (deckLocation) {
             deckLocationDisplay.textContent = `Место колоды: X:${deckLocation.x.toFixed(0)}, Y:${deckLocation.y.toFixed(0)}`;
-            collectCardsButton.disabled = false; // Активируем кнопку сбора карт
         } else {
             deckLocationDisplay.textContent = "Место колоды не задано";
-            collectCardsButton.disabled = true; // Деактивируем кнопку сбора карт
         }
     };
 
     // Обновляем при загрузке
     await updateDeckLocationDisplay();
 
-    // Слушатель для изменений метаданных комнаты (если место колоды изменится другим способом)
+    // Слушатель для изменений метаданных комнаты
     OBR.room.onMetadataChange(updateDeckLocationDisplay);
 
     shuffleButton.addEventListener("click", async () => {
         try {
             const selection = await OBR.player.getSelection();
-            if (!selection || selection.length === 0) return;
+            if (!selection || selection.length === 0) {
+                alert("Пожалуйста, выберите карты для перемешивания.");
+                return;
+            }
 
             const items = await OBR.scene.items.getItems(selection);
             const tokens = items.filter(i => i.position);
@@ -57,22 +57,44 @@ OBR.onReady(async () => {
 
             const cardOffset = parseInt(offsetSlider.value, 10);
 
-            // 1. Фиксируем точку якоря (самый верхний левый угол выделения)
-            const anchorX = Math.min(...tokens.map(t => t.position.x));
-            const anchorY = Math.min(...tokens.map(t => t.position.y));
+            // Определяем точку якоря
+            let targetX, targetY;
+            const metadata = await OBR.room.getMetadata();
+            let savedDeckLocation = metadata[METADATA_DECK_LOCATION_KEY];
 
-            // 2. Перемешиваем массив ID случайным образом
+            if (rememberDeckLocationCheckbox.checked) {
+                // Если чекбокс активен, запоминаем текущее верхнее левое положение выделения
+                targetX = Math.min(...tokens.map(t => t.position.x));
+                targetY = Math.min(...tokens.map(t => t.position.y));
+                await OBR.room.setMetadata({
+                    [METADATA_DECK_LOCATION_KEY]: { x: targetX, y: targetY }
+                });
+                savedDeckLocation = { x: targetX, y: targetY }; // Обновляем локальную переменную
+                console.log(`Deck location remembered: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
+            } else if (savedDeckLocation) {
+                // Если чекбокс неактивен, но место колоды уже есть, используем его
+                targetX = savedDeckLocation.x;
+                targetY = savedDeckLocation.y;
+                console.log(`Using remembered deck location: X:${targetX.toFixed(0)}, Y:${targetY.toFixed(0)}`);
+            } else {
+                // Если чекбокс неактивен и место колоды не задано, используем текущее верхнее левое положение выделения
+                targetX = Math.min(...tokens.map(t => t.position.x));
+                targetY = Math.min(...tokens.map(t => t.position.y));
+                console.log("No deck location remembered, shuffling within current selection.");
+            }
+
+            // Перемешиваем массив ID случайным образом
             const shuffledIds = shuffleArray([...selection]);
 
-            // 3. Массовое обновление
+            // Массовое обновление
             await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
                 const uniqueZIndexes = new Set(); 
                 
                 drafts.forEach((item, index) => {
                     if (item.position) {
                         item.position = {
-                            x: anchorX,
-                            y: anchorY + (index * cardOffset) 
+                            x: targetX,
+                            y: targetY + (index * cardOffset) 
                         };
 
                         let newZIndex = index;
@@ -85,75 +107,10 @@ OBR.onReady(async () => {
                 });
             });
 
-            console.log(`Deck shuffled on Y and Z axis with offset: ${cardOffset}!`);
+            console.log(`Deck shuffled and positioned with offset: ${cardOffset}!`);
+            await updateDeckLocationDisplay(); // Обновляем отображение после возможного сохранения
         } catch (error) {
             console.error("Shuffle Error:", error);
-        }
-    });
-
-    setDeckLocationButton.addEventListener("click", async () => {
-        await OBR.tool.selectAndClick(async (pointer) => {
-            const { x, y } = pointer.position;
-            await OBR.room.setMetadata({
-                [METADATA_DECK_LOCATION_KEY]: { x, y }
-            });
-            console.log(`Deck location set to X:${x.toFixed(0)}, Y:${y.toFixed(0)}`);
-            await updateDeckLocationDisplay(); // Обновляем отображение сразу
-        });
-    });
-
-    collectCardsButton.addEventListener("click", async () => {
-        try {
-            const metadata = await OBR.room.getMetadata();
-            const deckLocation = metadata[METADATA_DECK_LOCATION_KEY];
-
-            if (!deckLocation) {
-                alert("Пожалуйста, сначала установите место для колоды!");
-                return;
-            }
-
-            const selection = await OBR.player.getSelection();
-            if (!selection || selection.length === 0) {
-                alert("Пожалуйста, выберите карты для сбора.");
-                return;
-            }
-
-            const items = await OBR.scene.items.getItems(selection);
-            const tokens = items.filter(i => i.position);
-            if (tokens.length === 0) return;
-
-            const cardOffset = parseInt(offsetSlider.value, 10);
-
-            // 2. Перемешиваем массив ID случайным образом
-            const shuffledIds = shuffleArray([...selection]);
-
-            // 3. Массовое обновление
-            await OBR.scene.items.updateItems(shuffledIds, (drafts) => {
-                const uniqueZIndexes = new Set(); 
-                
-                drafts.forEach((item, index) => {
-                    if (item.position) {
-                        // Устанавливаем координаты на заданное место колоды
-                        // Смещение по Y для создания стопки
-                        item.position = {
-                            x: deckLocation.x,
-                            y: deckLocation.y + (index * cardOffset) 
-                        };
-
-                        // ПЕРЕМЕШИВАЕМ Z-ORDER (Ось Z)
-                        let newZIndex = index;
-                        while(uniqueZIndexes.has(newZIndex)) {
-                            newZIndex += 0.0001; 
-                        }
-                        item.zIndex = newZIndex;
-                        uniqueZIndexes.add(newZIndex);
-                    }
-                });
-            });
-
-            console.log(`Selected cards collected and stacked at deck location with offset: ${cardOffset}!`);
-        } catch (error) {
-            console.error("Collect Cards Error:", error);
         }
     });
 });
