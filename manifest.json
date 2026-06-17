@@ -1,11 +1,11 @@
 {
-  "name": "Shuffle Cards & Deck Location",
-  "version": "1.4.0",
+  "name": "Smart Deck Shuffler",
+  "version": "1.5.0",
   "manifest_version": 1,
   "author": "ChatGPT",
   "icon": "/icon.png",
   "action": {
-    "title": "Перемешать и Сохранить Место Колоды",
+    "title": "Умный Перемешиватель Колоды",
     "icon": "/icon.png",
     "popover": "/index.html",
     "height": 200,
